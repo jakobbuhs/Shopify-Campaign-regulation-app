@@ -6,7 +6,10 @@
         "build": "tsc",
         "start": "node dist/server.js",
         "migrate": "prisma migrate dev",
-        "generate": "prisma generate"
+        "generate": "prisma generate",
+        "postinstall": "prisma generate",
+        "build": "tsc",
+        "start": "node dist/server.js"
     },
     "dependencies": {
         "@prisma/client": "^5.0.0",
