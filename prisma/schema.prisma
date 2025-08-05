@@ -1,0 +1,51 @@
+// schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PriceChangeSource {
+  APP
+  MERCHANT
+}
+
+enum CampaignType {
+  SALE
+  CONDITIONAL
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  FINISHED
+}
+
+model PriceHistory {
+  id              Int               @id @default(autoincrement())
+  variantId       String
+  price           Decimal
+  compareAtPrice  Decimal?
+  changedAt       DateTime
+  changedBy       PriceChangeSource
+  campaign        Campaign?         @relation(fields: [campaignId], references: [id])
+  campaignId      Int?
+}
+
+model Campaign {
+  id              Int               @id @default(autoincrement())
+  name            String
+  type            CampaignType
+  startAt         DateTime
+  endAt           DateTime
+  discountLogic   Json
+  status          CampaignStatus
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  priceHistories  PriceHistory[]
+}
