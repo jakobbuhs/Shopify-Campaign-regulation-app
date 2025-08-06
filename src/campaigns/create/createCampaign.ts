@@ -28,9 +28,20 @@ router.post('/campaigns/create', async (req: Request, res: Response) => {
       },
     });
 
-    // Log variant IDs for now – these would be linked in a future step
-    console.log(`📦 Campaign created with ID ${campaign.id} for variants:`, variantIds);
-
+    // Save each variantId as a CampaignProduct entry
+await prisma.$transaction(
+    variantIds.map((variantId: string) =>
+      prisma.campaignProduct.create({
+        data: {
+          campaignId: campaign.id,
+          variantId,
+        },
+      })
+    )
+  );
+  
+  console.log(`✅ Linked ${variantIds.length} variants to campaign ${campaign.id}`);
+  
     res.status(201).json({ message: 'Campaign created', campaign });
   } catch (error) {
     console.error('❌ Failed to create campaign:', error);

@@ -50,4 +50,16 @@ model Campaign {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   priceHistories  PriceHistory[]
+
+  campaignProducts CampaignProduct[]
 }
+model CampaignProduct {
+  id         String   @id @default(cuid())
+  campaignId Int
+  variantId  String
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id])
+
+  createdAt  DateTime @default(now())
+}
+
