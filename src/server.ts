@@ -5,7 +5,7 @@ import { PrismaClient, PriceChangeSource, Prisma } from '@prisma/client';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { verifyShopifyWebhook } from './webhookVerifier';
-import createCampaignRouter from './src/campaigns/create/createCampaign';
+import createCampaignRouter from './campaigns/create/createCampaign';
 
 dotenv.config();
 
