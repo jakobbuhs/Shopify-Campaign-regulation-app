@@ -58,11 +58,17 @@ async function applyCampaigns() {
             product { id }
             userErrors { field message }
           }
+            userErrors { field message }
+          }
         }`;
 
         const bulkResp = (await client.request(bulkMutation, {
           productId: variant.product.id,
-          variants: [{ id: variantIdGid, price: discountedPrice.toFixed(2) }],
+          variants: [{
+            id: variantIdGid,
+            price: discountedPrice.toFixed(2),
+            compareAtPrice: originalPrice.toFixed(2) // show original as strikethrough price
+          }],
         })) as any;
 
         const bulkErrors = bulkResp.productVariantsBulkUpdate.userErrors;
