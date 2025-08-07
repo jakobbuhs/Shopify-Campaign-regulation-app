@@ -1,4 +1,4 @@
-// processScheduledCampaigns.ts - Apply scheduled campaign discounts
+// processScheduledCampaigns.ts - Apply scheduled campaign discounts using productVariantsBulkUpdate (2024-10 compatible)
 
 import { PrismaClient, CampaignStatus, PriceChangeSource, Prisma } from '@prisma/client';
 import dotenv from 'dotenv';
@@ -8,7 +8,8 @@ dotenv.config();
 
 const prisma = new PrismaClient();
 
-const SHOPIFY_ADMIN_API = `https://${process.env.SHOP_DOMAIN}/admin/api/2024-04/graphql.json`;
+// Use latest Admin API (2024-10+) – bulk mutation is available
+const SHOPIFY_ADMIN_API = `https://${process.env.SHOP_DOMAIN}/admin/api/2024-10/graphql.json`;
 const client = new GraphQLClient(SHOPIFY_ADMIN_API, {
   headers: {
     'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN || '',
@@ -16,77 +17,61 @@ const client = new GraphQLClient(SHOPIFY_ADMIN_API, {
   },
 });
 
+function toGid(id: string): string {
+  return id.startsWith('gid://') ? id : `gid://shopify/ProductVariant/${id}`;
+}
+
 async function applyCampaigns() {
   const now = new Date();
 
   const campaigns = await prisma.campaign.findMany({
-    where: {
-      status: CampaignStatus.DRAFT,
-      startAt: { lte: now },
-    },
-    include: {
-      campaignProducts: true,
-    },
+    where: { status: CampaignStatus.DRAFT, startAt: { lte: now } },
+    include: { campaignProducts: true },
   });
 
   for (const campaign of campaigns) {
     console.log(`🎯 Activating campaign ${campaign.id} - ${campaign.name}`);
 
-    const discount = campaign.discountLogic as { type: string; value: number };
-    if (!discount || !discount.type || discount.value == null) {
-        console.warn(`⚠️ Missing discount logic in campaign ${campaign.id}`);
-        continue;
-      }
-      
-
+    const discount = campaign.discountLogic as { type: string; value: number } | null;
+    if (!discount) { console.warn(`⚠️  Missing discount logic in campaign ${campaign.id}`); continue; }
 
     for (const entry of campaign.campaignProducts) {
-      const variantId = entry.variantId;
+      const variantIdGid = toGid(entry.variantId);
 
       try {
-        // Fetch original variant price (GraphQL call)
-        const fetchQuery = gql`
-          query fetchVariant($id: ID!) {
-            productVariant(id: $id) {
-              id
-              price
-              compareAtPrice
-            }
-          }
-        `;
-
-        const variantData = await client.request(fetchQuery, { id: variantId });
-        const variant = (variantData as any).productVariant;
-
+        // 1️⃣ Fetch variant price **and productId**
+        const fetchQuery = gql`query ($id: ID!) {
+          productVariant(id: $id) { id price compareAtPrice product { id } }
+        }`;
+        const fetchResp = (await client.request(fetchQuery, { id: variantIdGid })) as any;
+        const variant = fetchResp.productVariant;
+        if (!variant) { console.warn(`⚠️  Variant ${variantIdGid} not found`); continue; }
 
         const originalPrice = parseFloat(variant.price);
-        const discountedPrice = (discount.type === 'percentage')
+        const discountedPrice = discount.type === 'percentage'
           ? originalPrice * (1 - discount.value / 100)
           : originalPrice - discount.value;
 
-        // Update Shopify variant price (GraphQL mutation)
-        const mutation = gql`
-          mutation updateVariant($input: ProductVariantInput!) {
-            productVariantUpdate(input: $input) {
-              productVariant {
-                id
-                price
-              }
-              userErrors { field message }
-            }
+        // 2️⃣ Bulk update (works in 2024‑10+)
+        const bulkMutation = gql`mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+          productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+            product { id }
+            userErrors { field message }
           }
-        `;
+        }`;
 
-        await client.request(mutation, {
-          input: {
-            id: variantId,
-            price: discountedPrice.toFixed(2),
-          },
-        });
+        const bulkResp = (await client.request(bulkMutation, {
+          productId: variant.product.id,
+          variants: [{ id: variantIdGid, price: discountedPrice.toFixed(2) }],
+        })) as any;
 
+        const bulkErrors = bulkResp.productVariantsBulkUpdate.userErrors;
+        if (bulkErrors.length) { console.error('❌ Shopify userErrors:', bulkErrors); continue; }
+
+        // 3️⃣ Record price history
         await prisma.priceHistory.create({
           data: {
-            variantId,
+            variantId: entry.variantId,
             price: new Prisma.Decimal(originalPrice),
             compareAtPrice: variant.compareAtPrice ? new Prisma.Decimal(variant.compareAtPrice) : null,
             changedBy: PriceChangeSource.APP,
@@ -95,25 +80,17 @@ async function applyCampaigns() {
           },
         });
 
-        console.log(`✅ Applied discount to ${variantId}: ${originalPrice} → ${discountedPrice.toFixed(2)}`);
+        console.log(`✅ ${variantIdGid}: ${originalPrice} → ${discountedPrice.toFixed(2)}`);
       } catch (err) {
-        console.error(`❌ Failed to update variant ${entry.variantId}:`, err);
+        console.error(`❌ Failed variant ${variantIdGid}:`, err);
       }
     }
 
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: CampaignStatus.ACTIVE },
-    });
-
-    console.log(`📦 Campaign ${campaign.id} marked as ACTIVE.`);
+    await prisma.campaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.ACTIVE } });
+    console.log(`📦 Campaign ${campaign.id} is now ACTIVE.`);
   }
 }
 
 applyCampaigns()
-  .catch((err) => {
-    console.error('❌ Campaign processor failed:', err);
-  })
-  .finally(() => {
-    prisma.$disconnect();
-  });
+  .catch(err => console.error('❌ Processor crashed:', err))
+  .finally(() => prisma.$disconnect());
