@@ -29,9 +29,19 @@ async function applyCampaigns() {
     });
     for (const campaign of campaigns) {
         console.log(`🎯 Activating campaign ${campaign.id} - ${campaign.name}`);
+        const complianceErrors = await (0, compliance_1.validateCampaign)(campaign);
+        if (complianceErrors.length) {
+            console.error(`❌ Compliance failed for campaign ${campaign.id}:`, complianceErrors);
+            continue; // skip activation
+        }
         const discount = campaign.discountLogic;
         if (!discount) {
             console.warn(`⚠️  Missing discount logic in campaign ${campaign.id}`);
+            continue;
+        }
+        const errors = await (0, compliance_1.validateCampaign)(campaign);
+        if (errors.length) {
+            console.error(`❌ Compliance failed for campaign ${campaign.id}:`, errors);
             continue;
         }
         for (const entry of campaign.campaignProducts) {
@@ -52,11 +62,6 @@ async function applyCampaigns() {
                     ? originalPrice * (1 - discount.value / 100)
                     : originalPrice - discount.value;
                 // Inside for(const campaign of campaigns) { … }
-                const complianceErrors = await (0, compliance_1.validateCampaign)(campaign);
-                if (complianceErrors.length) {
-                    console.error(`❌ Compliance failed for campaign ${campaign.id}:`, complianceErrors);
-                    continue; // skip activation
-                }
                 // 2️⃣ Bulk update (works in 2024‑10+)
                 const bulkMutation = (0, graphql_request_1.gql) `
   mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
