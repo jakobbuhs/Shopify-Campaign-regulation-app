@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { verifyShopifyWebhook } from './webhookVerifier';
 import createCampaignRouter from './campaigns/create/createCampaign';
+import listCampaignsRouter from './campaigns/list/listCampaigns';
+
 
 dotenv.config();
 
@@ -27,6 +29,7 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/webhooks/products/update', express.raw({ type: 'application/json' }));
 app.use(express.json()); // Make sure this comes before the route
 app.use(createCampaignRouter);
+app.use(listCampaignsRouter);
 
 
 // Webhook route with HMAC verifier middleware
