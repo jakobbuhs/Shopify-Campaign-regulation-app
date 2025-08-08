@@ -9,6 +9,7 @@ const client_1 = require("@prisma/client");
 const dotenv_1 = __importDefault(require("dotenv"));
 const webhookVerifier_1 = require("./webhookVerifier");
 const createCampaign_1 = __importDefault(require("./campaigns/create/createCampaign"));
+const listCampaigns_1 = __importDefault(require("./campaigns/list/listCampaigns"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const prisma = new client_1.PrismaClient();
@@ -25,6 +26,7 @@ app.get('/health', (_req, res) => {
 app.use('/webhooks/products/update', express_1.default.raw({ type: 'application/json' }));
 app.use(express_1.default.json()); // Make sure this comes before the route
 app.use(createCampaign_1.default);
+app.use(listCampaigns_1.default);
 // Webhook route with HMAC verifier middleware
 app.post('/webhooks/products/update', (0, webhookVerifier_1.verifyShopifyWebhook)(secret), async (req, res) => {
     try {

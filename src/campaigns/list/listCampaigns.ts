@@ -9,9 +9,6 @@ const prisma = new PrismaClient();
 router.get('/campaigns', async (_req: Request, res: Response) => {
   try {
     const campaigns = await prisma.campaign.findMany({
-      include: {
-        campaignProducts: true,
-      },
       orderBy: { startAt: 'desc' },
     });
     res.json(campaigns);
@@ -27,18 +24,23 @@ router.get('/campaigns/:id', async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
     const campaign = await prisma.campaign.findUnique({
       where: { id },
-      include: {
-        campaignProducts: true,
-        priceHistory: {
-          where: { campaignId: id },
-          orderBy: { changedAt: 'asc' },
-        },
-      },
     });
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
-    res.json(campaign);
+    const campaignProducts = await prisma.campaignProduct.findMany({
+      where: { campaignId: id },
+    });
+    const priceHistory = await prisma.priceHistory.findMany({
+      where: { campaignId: id },
+      orderBy: { changedAt: 'asc' },
+    });
+
+    res.json({
+      ...campaign,
+      campaignProducts,
+      priceHistory,
+    });
   } catch (error) {
     console.error(`❌ Failed to get campaign ${req.params.id}:`, error);
     res.status(500).json({ error: 'Internal server error' });

@@ -1,50 +1,48 @@
-// createCampaign.ts - POST /campaigns/create
-
+// src/campaigns/list/listCampaigns.ts - List and retrieve campaigns with details
 import express, { Request, Response } from 'express';
-import { PrismaClient, CampaignType, CampaignStatus } from '@prisma/client';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.post('/campaigns/create', async (req: Request, res: Response) => {
+// GET /campaigns - list all campaigns
+router.get('/campaigns', async (_req: Request, res: Response) => {
   try {
-    const { name, type, startAt, endAt, variantIds, discountLogic } = req.body;
+    const campaigns = await prisma.campaign.findMany({
+      orderBy: { startAt: 'desc' },
+    });
+    res.json(campaigns);
+  } catch (error) {
+    console.error('❌ Failed to list campaigns:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    if (!name || !type || !startAt || !endAt || !variantIds || !discountLogic) {
-      return res.status(400).json({ error: 'Missing required fields' });
+// GET /campaigns/:id - get a single campaign with products and price history
+router.get('/campaigns/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const campaign = await prisma.campaign.findUnique({
+      where: { id },
+    });
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
     }
-
-    const campaign = await prisma.campaign.create({
-      data: {
-        name,
-        type: type as CampaignType,
-        startAt: new Date(startAt),
-        endAt: new Date(endAt),
-        discountLogic,
-        status: CampaignStatus.DRAFT,
-      },
+    const campaignProducts = await prisma.campaignProduct.findMany({
+      where: { campaignId: id },
+    });
+    const priceHistory = await prisma.priceHistory.findMany({
+      where: { campaignId: id },
+      orderBy: { changedAt: 'asc' },
     });
 
-    // Save each variantId as a CampaignProduct entry
-    await prisma.$transaction(
-      variantIds.map((variantId: string) =>
-        prisma.campaignProduct.create({
-          data: {
-            campaignId: campaign.id,
-            variantId,
-          },
-        })
-      )
-    );
-
-    console.log(`✅ Linked ${variantIds.length} variants to campaign ${campaign.id}`);
-
-    res.status(201).json({ message: 'Campaign created', campaign });
+    res.json({
+      ...campaign,
+      campaignProducts,
+      priceHistory,
+    });
   } catch (error) {
-    console.error('❌ Failed to create campaign:', error);
+    console.error(`❌ Failed to get campaign ${req.params.id}:`, error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
