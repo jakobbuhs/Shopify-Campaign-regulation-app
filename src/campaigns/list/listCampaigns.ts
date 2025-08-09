@@ -19,32 +19,38 @@ router.get('/campaigns', async (_req: Request, res: Response) => {
 });
 
 // GET /campaigns/:id - get a single campaign with products and price history
+// GET /campaigns/:id
 router.get('/campaigns/:id', async (req: Request, res: Response) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const idParam = req.params.id;
+    const id = Number(idParam);
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: `Invalid campaign id: ${idParam}` });
+    }
+
     const campaign = await prisma.campaign.findUnique({
       where: { id },
+      include: {
+        campaignProducts: true,
+        // Ensure this matches your Prisma model: it's "priceHistories", not "priceHistory"
+        priceHistories: {
+          orderBy: { changedAt: 'desc' },
+          take: 50,
+        },
+      },
     });
+
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
-    const campaignProducts = await prisma.campaignProduct.findMany({
-      where: { campaignId: id },
-    });
-    const priceHistory = await prisma.priceHistory.findMany({
-      where: { campaignId: id },
-      orderBy: { changedAt: 'asc' },
-    });
 
-    res.json({
-      ...campaign,
-      campaignProducts,
-      priceHistory,
-    });
-  } catch (error) {
-    console.error(`❌ Failed to get campaign ${req.params.id}:`, error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.json(campaign);
+  } catch (err) {
+    console.error('❌ Failed to get campaign by id:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 export default router;

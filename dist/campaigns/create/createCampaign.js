@@ -1,49 +1,44 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/campaigns/list/listCampaigns.ts - List and retrieve campaigns with details
-const express_1 = __importDefault(require("express"));
+// src/campaigns/create/createCampaign.ts
+const express_1 = require("express");
 const client_1 = require("@prisma/client");
-const router = express_1.default.Router();
 const prisma = new client_1.PrismaClient();
-// GET /campaigns - list all campaigns
-router.get('/campaigns', async (_req, res) => {
+const router = (0, express_1.Router)();
+/**
+ * POST /campaigns/create
+ * body: { name, type, startAt, endAt, variantIds: string[], discountLogic }
+ */
+router.post('/campaigns/create', async (req, res) => {
+    var _a;
     try {
-        const campaigns = await prisma.campaign.findMany({
-            orderBy: { startAt: 'desc' },
-        });
-        res.json(campaigns);
-    }
-    catch (error) {
-        console.error('❌ Failed to list campaigns:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-// GET /campaigns/:id - get a single campaign with products and price history
-router.get('/campaigns/:id', async (req, res) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        const campaign = await prisma.campaign.findUnique({
-            where: { id },
-        });
-        if (!campaign) {
-            return res.status(404).json({ error: 'Campaign not found' });
+        const { name, type, startAt, endAt, variantIds, discountLogic } = req.body;
+        if (!name || !startAt || !endAt || !Array.isArray(variantIds) || !discountLogic) {
+            return res.status(400).json({ error: 'Missing required fields' });
         }
-        const campaignProducts = await prisma.campaignProduct.findMany({
-            where: { campaignId: id },
+        const start = new Date(startAt);
+        const end = new Date(endAt);
+        if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+            return res.status(400).json({ error: 'Invalid start/end dates' });
+        }
+        const campaign = await prisma.campaign.create({
+            data: {
+                name,
+                type: (_a = type) !== null && _a !== void 0 ? _a : 'SALE',
+                startAt: start,
+                endAt: end,
+                status: client_1.CampaignStatus.DRAFT,
+                discountLogic,
+                campaignProducts: {
+                    create: variantIds.map((id) => ({ variantId: id })),
+                },
+            },
         });
-        const priceHistory = await prisma.priceHistory.findMany({
-            where: { campaignId: id },
-            orderBy: { changedAt: 'asc' },
-        });
-        res.json(Object.assign(Object.assign({}, campaign), { campaignProducts,
-            priceHistory }));
+        return res.json({ message: 'Campaign created', campaign });
     }
-    catch (error) {
-        console.error(`❌ Failed to get campaign ${req.params.id}:`, error);
-        res.status(500).json({ error: 'Internal server error' });
+    catch (err) {
+        console.error('createCampaign error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 });
 exports.default = router;

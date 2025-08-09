@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useRouter } from 'next/router'
-import Fuse from 'fuse.js'
 
 type Variant = { id: string; name: string; price: string }
 
@@ -11,36 +10,10 @@ export default function CreateCampaign() {
   const [products, setProducts] = useState<Variant[]>([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
 
-  // Fetch all product variants on mount
-  useEffect(() => {
-    axios
-      .get<Variant[]>(`${process.env.NEXT_PUBLIC_API_URL}/products`)
-      .then(res => setProducts(res.data))
-      .catch(err => console.error('Failed to fetch products', err))
-  }, [])
-
-  // Initialize Fuse with higher threshold
-  const fuse = useMemo(
-    () => new Fuse(products, {
-      keys: ['name'],
-      threshold: 0.6,
-      ignoreLocation: true,
-      distance: 100,
-    }),
-    [products]
-  )
-
-  // Compute filtered products: fuzzy first, then fallback substring
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return products
-    const fuzzy = fuse.search(term).map(r => r.item)
-    if (fuzzy.length) return fuzzy
-    // fallback to simple substring match
-    return products.filter(p => p.name.toLowerCase().includes(term))
-  }, [search, products, fuse])
-
+  // Toggle selection
   const toggle = (id: string) => {
     setSelected(prev => {
       const s = new Set(prev)
@@ -49,20 +22,44 @@ export default function CreateCampaign() {
     })
   }
 
+  // Debounced, cancelable search hitting your backend
+  useEffect(() => {
+    const controller = new AbortController()
+    const id = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+          params: { q: search, limit: 25 },
+          signal: controller.signal as any,
+        })
+        setProducts(resp.data.items || [])
+        setNextCursor(resp.data.nextCursor ?? null)
+      } catch (e: any) {
+        if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
+          console.error(e)
+        }
+      } finally {
+        setLoading(false)
+      }
+    }, 250) // debounce
+
+    return () => {
+      controller.abort()
+      clearTimeout(id)
+    }
+  }, [search])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/campaigns/create`,
-        {
-          name: form.name,
-          type: 'SALE',
-          startAt: form.startAt,
-          endAt: form.endAt,
-          variantIds: Array.from(selected),
-          discountLogic: { type: 'percentage', value: Number(form.value) }
-        }
-      )
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/campaigns/create`, {
+        name: form.name,
+        type: 'SALE',
+        startAt: form.startAt,
+        endAt: form.endAt,
+        variantIds: Array.from(selected),
+        discountLogic: { type: 'percentage', value: Number(form.value) },
+      })
       router.push('/')
     } catch (err) {
       console.error('❌ Failed to create campaign:', err)
@@ -72,20 +69,20 @@ export default function CreateCampaign() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-6 bg-white rounded shadow">
       <h1 className="text-2xl font-bold">New Campaign</h1>
+
       <input
         type="text"
         placeholder="Search products..."
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={(e) => setSearch(e.target.value)}
         className="w-full p-2 border rounded mb-4 focus:outline-indigo-500"
       />
 
       <div className="max-h-64 overflow-y-auto border p-2 rounded">
-        {filtered.map(p => (
-          <label
-            key={p.id}
-            className="flex items-center space-x-2 mb-2 hover:bg-gray-50 p-1 rounded"
-          >
+        {loading && <p className="text-gray-500 text-center">Searching…</p>}
+
+        {!loading && products.map((p) => (
+          <label key={p.id} className="flex items-center space-x-2 mb-2 hover:bg-gray-50 p-1 rounded">
             <input
               type="checkbox"
               checked={selected.has(p.id)}
@@ -95,10 +92,27 @@ export default function CreateCampaign() {
             <span className="text-gray-800">{p.name} • ${p.price}</span>
           </label>
         ))}
-        {filtered.length === 0 && (
-          <p className="text-gray-500 text-center">No products match "{search}"</p>
+
+        {!loading && products.length === 0 && (
+          <p className="text-gray-500 text-center">No products match “{search}”</p>
         )}
       </div>
+
+      {nextCursor && (
+        <button
+          type="button"
+          onClick={async () => {
+            const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+              params: { q: search, limit: 25, cursor: nextCursor },
+            })
+            setProducts((prev) => [...prev, ...(resp.data.items || [])])
+            setNextCursor(resp.data.nextCursor ?? null)
+          }}
+          className="mt-2 w-full py-2 border rounded"
+        >
+          Load more
+        </button>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input

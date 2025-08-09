@@ -63,3 +63,26 @@ model CampaignProduct {
   createdAt  DateTime @default(now())
 }
 
+// prisma/schema.prisma
+model Product {
+  id       String   @id          // Shopify GID, e.g. gid://shopify/Product/123
+  title    String
+  vendor   String? 
+  handle   String? 
+  variants Variant[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Variant {
+  id        String  @id          // Shopify GID, e.g. gid://shopify/ProductVariant/456
+  title     String
+  sku       String?
+  price     Decimal
+  product   Product @relation(fields: [productId], references: [id])
+  productId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([title])
+}
