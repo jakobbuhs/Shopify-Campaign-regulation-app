@@ -7,6 +7,9 @@ import crypto from 'crypto';
 import { verifyShopifyWebhook } from './webhookVerifier';
 import createCampaignRouter from './campaigns/create/createCampaign';
 import listCampaignsRouter from './campaigns/list/listCampaigns';
+import listProductsRouter from './products/listProducts';
+import cors from 'cors';
+
 
 
 dotenv.config();
@@ -31,6 +34,11 @@ app.use(express.json()); // Make sure this comes before the route
 app.use(createCampaignRouter);
 app.use(listCampaignsRouter);
 
+app.use(cors({
+    origin: [process.env.APP_URL || '*']
+  }));
+  
+  app.use(listProductsRouter);
 
 // Webhook route with HMAC verifier middleware
 app.post(
