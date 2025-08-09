@@ -8,10 +8,10 @@ export default function CreateCampaign() {
   const router = useRouter()
   const [form, setForm] = useState({ name: '', startAt: '', endAt: '', value: '' })
   const [products, setProducts] = useState<Variant[]>([])
+  const [allProducts, setAllProducts] = useState<Variant[]>([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
 
   // Toggle selection
   const toggle = (id: string) => {
@@ -22,32 +22,29 @@ export default function CreateCampaign() {
     })
   }
 
-  // Debounced, cancelable search hitting your backend
+  // Fetch all products once and filter locally as the user types
   useEffect(() => {
-    const controller = new AbortController()
-    const id = setTimeout(async () => {
+    const fetchProducts = async () => {
       setLoading(true)
       try {
-        const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
-          params: { q: search, limit: 25 },
-          signal: controller.signal as any,
-        })
-        setProducts(resp.data.items || [])
-        setNextCursor(resp.data.nextCursor ?? null)
-      } catch (e: any) {
-        if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
-          console.error(e)
-        }
+        const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`)
+        setAllProducts(resp.data || [])
+        setProducts(resp.data || [])
+      } catch (e) {
+        console.error(e)
       } finally {
         setLoading(false)
       }
-    }, 250) // debounce
-
-    return () => {
-      controller.abort()
-      clearTimeout(id)
     }
-  }, [search])
+    fetchProducts()
+  }, [])
+
+  useEffect(() => {
+    const query = search.toLowerCase()
+    setProducts(
+      allProducts.filter((p) => p.name.toLowerCase().includes(query))
+    )
+  }, [search, allProducts])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,21 +95,6 @@ export default function CreateCampaign() {
         )}
       </div>
 
-      {nextCursor && (
-        <button
-          type="button"
-          onClick={async () => {
-            const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
-              params: { q: search, limit: 25, cursor: nextCursor },
-            })
-            setProducts((prev) => [...prev, ...(resp.data.items || [])])
-            setNextCursor(resp.data.nextCursor ?? null)
-          }}
-          className="mt-2 w-full py-2 border rounded"
-        >
-          Load more
-        </button>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
