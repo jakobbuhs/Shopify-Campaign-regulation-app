@@ -11,6 +11,10 @@ export default function CreateCampaign() {
   const [products, setProducts] = useState<Variant[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<string[]>([]);
+  const [override30d, setOverride30d] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+
 
   // select handling
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -52,24 +56,33 @@ export default function CreateCampaign() {
     const startISO = new Date(form.startAt).toISOString();
     const endISO   = new Date(form.endAt).toISOString();
   
+    setErrors([]);
     try {
+      setErrors([]);
       await axios.post('/api/campaigns/create', {
         name: form.name,
         type: 'SALE',
-        startAt: startISO,
-        endAt: endISO,
+        startAt: new Date(form.startAt).toISOString(),
+        endAt: new Date(form.endAt).toISOString(),
         variantIds: Array.from(selected),
         discountLogic: { type: 'percentage', value: Number(form.value) },
+        override30d,
+        overrideReason: override30d ? overrideReason : undefined,
       });
-      router.push('/');
+      router.push('/campaigns');
     } catch (err: any) {
-      // Helpful diagnostics in DevTools
-      if (err.response) {
-        console.error('Create failed:', err.response.status, err.response.data);
+      if (err.response?.status === 422) {
+        const v = err.response.data?.violations ?? [];
+        setErrors(
+          v.map((x: any) =>
+            `${x.variantId}: ${x.message}${x.minPriceLast30 != null ? ` (30d low: ${x.minPriceLast30})` : ''}`
+          )
+        );
       } else {
-        console.error('Network error:', err.message);
+        setErrors([err.response?.data?.error || err.message || 'Failed to create campaign']);
       }
     }
+    
   };
 
   return (
@@ -102,7 +115,15 @@ export default function CreateCampaign() {
         {!loading && products.length === 0 && (
           <p className="text-gray-500 text-center">No products match “{search}”</p>
         )}
+        {errors.length > 0 && (
+      <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="font-medium mb-1">Compliance check failed:</div>
+        <ul className="list-disc pl-5 space-y-1">
+          {errors.map((e, i) => <li key={i}>{e}</li>)}
+        </ul>
       </div>
+    )}
+              </div>
 
       {nextCursor && (
         <button
@@ -119,6 +140,7 @@ export default function CreateCampaign() {
           Load more
         </button>
       )}
+      
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -154,11 +176,39 @@ export default function CreateCampaign() {
           onChange={e => setForm(prev => ({ ...prev, value: e.target.value }))}
           className="w-full p-3 border rounded focus:outline-indigo-500"
         />
-        <button
-          type="submit"
-          disabled={selected.size === 0}
-          className="w-full py-3 bg-indigo-600 text-white rounded disabled:opacity-50 hover:bg-indigo-500"
-        >
+        <div className="space-y-2 border-t pt-4">
+  <label className="flex items-start gap-2">
+    <input
+      type="checkbox"
+      className="mt-1"
+      checked={override30d}
+      onChange={(e) => setOverride30d(e.target.checked)}
+    />
+    <span className="text-sm text-gray-800">
+      Override the 30-day price rule (allow if current price is above 30-day low or no history exists).
+      <span className="block text-gray-500">
+        Other validations still apply. Use only with justification.
+      </span>
+    </span>
+  </label>
+
+  {override30d && (
+    <textarea
+      value={overrideReason}
+      onChange={(e) => setOverrideReason(e.target.value)}
+      placeholder="Why is this override necessary?"
+      className="w-full p-2 border rounded"
+      rows={3}
+      required
+    />
+  )}
+</div>
+
+<button
+  type="submit"
+  disabled={selected.size === 0 || (override30d && overrideReason.trim().length === 0)}
+  className="w-full py-3 bg-indigo-600 text-white rounded disabled:opacity-50 hover:bg-indigo-500"
+>
           Create Campaign
         </button>
       </form>
