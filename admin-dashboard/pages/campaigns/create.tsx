@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useRouter } from 'next/router'
 
@@ -7,13 +7,13 @@ type Variant = { id: string; name: string; price: string }
 export default function CreateCampaign() {
   const router = useRouter()
   const [form, setForm] = useState({ name: '', startAt: '', endAt: '', value: '' })
-  const [products, setProducts] = useState<Variant[]>([])
-  const [allProducts, setAllProducts] = useState<Variant[]>([])
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [products, setProducts] = useState<Variant[]>([])
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Toggle selection
+  // select handling
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const toggle = (id: string) => {
     setSelected(prev => {
       const s = new Set(prev)
@@ -22,46 +22,55 @@ export default function CreateCampaign() {
     })
   }
 
-  // Fetch all products once and filter locally as the user types
+  // debounced, cancelable search
   useEffect(() => {
-    const fetchProducts = async () => {
+    const controller = new AbortController()
+    const t = setTimeout(async () => {
       setLoading(true)
       try {
-        const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`)
-        setAllProducts(resp.data || [])
-        setProducts(resp.data || [])
-      } catch (e) {
-        console.error(e)
+        const resp = await axios.get('/api/products', { params: { q: search, limit: 25 }, signal: controller.signal as any })
+        setProducts(resp.data.items ?? [])
+        setNextCursor(resp.data.nextCursor ?? null)
+      } catch (e: any) {
+        if (e.name !== 'CanceledError' && e.code !== 'ERR_CANCELED') {
+          console.error('Search error', e)
+        }
       } finally {
         setLoading(false)
       }
+    }, 250)
+    return () => {
+      controller.abort()
+      clearTimeout(t)
     }
-    fetchProducts()
-  }, [])
-
-  useEffect(() => {
-    const query = search.toLowerCase()
-    setProducts(
-      allProducts.filter((p) => p.name.toLowerCase().includes(query))
-    )
-  }, [search, allProducts])
+  }, [search])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+  
+    // Convert datetime-local to ISO (backend expects real ISO times)
+    const startISO = new Date(form.startAt).toISOString();
+    const endISO   = new Date(form.endAt).toISOString();
+  
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/campaigns/create`, {
+      await axios.post('/api/campaigns/create', {
         name: form.name,
         type: 'SALE',
-        startAt: form.startAt,
-        endAt: form.endAt,
+        startAt: startISO,
+        endAt: endISO,
         variantIds: Array.from(selected),
         discountLogic: { type: 'percentage', value: Number(form.value) },
-      })
-      router.push('/')
-    } catch (err) {
-      console.error('❌ Failed to create campaign:', err)
+      });
+      router.push('/');
+    } catch (err: any) {
+      // Helpful diagnostics in DevTools
+      if (err.response) {
+        console.error('Create failed:', err.response.status, err.response.data);
+      } else {
+        console.error('Network error:', err.message);
+      }
     }
-  }
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-6 bg-white rounded shadow">
@@ -69,16 +78,17 @@ export default function CreateCampaign() {
 
       <input
         type="text"
-        placeholder="Search products..."
+        placeholder="Search products…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full p-2 border rounded mb-4 focus:outline-indigo-500"
+        className="w-full p-2 border rounded mb-2 focus:outline-indigo-500"
       />
+      <div className="text-sm text-gray-500 mb-2">
+        {loading ? 'Searching…' : `${products.length} result${products.length === 1 ? '' : 's'}`}
+      </div>
 
       <div className="max-h-64 overflow-y-auto border p-2 rounded">
-        {loading && <p className="text-gray-500 text-center">Searching…</p>}
-
-        {!loading && products.map((p) => (
+        {!loading && products.map(p => (
           <label key={p.id} className="flex items-center space-x-2 mb-2 hover:bg-gray-50 p-1 rounded">
             <input
               type="checkbox"
@@ -89,12 +99,26 @@ export default function CreateCampaign() {
             <span className="text-gray-800">{p.name} • ${p.price}</span>
           </label>
         ))}
-
         {!loading && products.length === 0 && (
           <p className="text-gray-500 text-center">No products match “{search}”</p>
         )}
       </div>
 
+      {nextCursor && (
+        <button
+          type="button"
+          onClick={async () => {
+            const resp = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/products`, {
+              params: { q: search, limit: 25, cursor: nextCursor },
+            })
+            setProducts(prev => [...prev, ...(resp.data.items ?? [])])
+            setNextCursor(resp.data.nextCursor ?? null)
+          }}
+          className="mt-2 w-full py-2 border rounded"
+        >
+          Load more
+        </button>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
@@ -122,6 +146,9 @@ export default function CreateCampaign() {
         </div>
         <input
           name="value"
+          type="number"
+          min="0"
+          step="1"
           placeholder="Discount %"
           value={form.value}
           onChange={e => setForm(prev => ({ ...prev, value: e.target.value }))}
@@ -135,6 +162,11 @@ export default function CreateCampaign() {
           Create Campaign
         </button>
       </form>
+
+      {/* tiny debug footer */}
+      <pre className="text-xs text-gray-400 overflow-x-auto">
+        API: {process.env.NEXT_PUBLIC_API_URL}/products?q={search}
+      </pre>
     </div>
   )
 }

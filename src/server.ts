@@ -9,7 +9,7 @@ import createCampaignRouter from './campaigns/create/createCampaign';
 import listCampaignsRouter from './campaigns/list/listCampaigns';
 import listProductsRouter from './products/listProducts';
 import cors from 'cors';
-
+import dbListProductsRouter from './products/dbListProducts';
 
 
 dotenv.config();
@@ -33,9 +33,9 @@ app.use('/webhooks/products/update', express.raw({ type: 'application/json' }));
 app.use(express.json()); // Make sure this comes before the route
 app.use(createCampaignRouter);
 app.use(listCampaignsRouter);
-
+app.use(dbListProductsRouter);
 app.use(cors({
-    origin: [process.env.APP_URL || '*']
+    origin: [process.env.APP_URL || 'http://localhost:3000'],
   }));
   
   app.use(listProductsRouter);

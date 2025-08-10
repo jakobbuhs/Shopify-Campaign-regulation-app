@@ -1,48 +1,72 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-// src/campaigns/list/listCampaigns.ts - List and retrieve campaigns with details
-const express_1 = __importDefault(require("express"));
+// src/campaigns/list/listCampaigns.ts
+const express_1 = require("express");
 const client_1 = require("@prisma/client");
-const router = express_1.default.Router();
 const prisma = new client_1.PrismaClient();
-// GET /campaigns - list all campaigns
-router.get('/campaigns', async (_req, res) => {
+const router = (0, express_1.Router)();
+/**
+ * GET /campaigns?status=ACTIVE|DRAFT|FINISHED&limit=50
+ */
+router.get('/campaigns', async (req, res) => {
+    var _a;
     try {
-        const campaigns = await prisma.campaign.findMany({
-            orderBy: { startAt: 'desc' },
+        const statusParam = (_a = req.query.status) === null || _a === void 0 ? void 0 : _a.toUpperCase();
+        const limit = Math.min(parseInt(req.query.limit || '100', 10), 200);
+        const where = statusParam && (statusParam in client_1.CampaignStatus)
+            ? { status: statusParam }
+            : {};
+        // sensible ordering: upcoming/active first by start date; finished last by end date desc
+        const orderBy = where.status === client_1.CampaignStatus.FINISHED
+            ? [{ endAt: 'desc' }]
+            : [{ startAt: 'asc' }];
+        const items = await prisma.campaign.findMany({
+            where,
+            orderBy,
+            take: limit,
+            include: {
+                campaignProducts: true,
+            },
         });
-        res.json(campaigns);
+        res.json({
+            items: items.map((c) => ({
+                id: c.id,
+                name: c.name,
+                status: c.status,
+                startAt: c.startAt,
+                endAt: c.endAt,
+                type: c.type,
+                variantsCount: c.campaignProducts.length,
+                createdAt: c.createdAt,
+                updatedAt: c.updatedAt,
+            })),
+        });
     }
-    catch (error) {
-        console.error('❌ Failed to list campaigns:', error);
+    catch (err) {
+        console.error('❌ Failed to list campaigns:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-// GET /campaigns/:id - get a single campaign with products and price history
-router.get('/campaigns/:id', async (req, res) => {
+// GET /campaigns/:id(\\d+) — keep your existing handler for details
+router.get('/campaigns/:id(\\d+)', async (req, res) => {
     try {
-        const id = parseInt(req.params.id, 10);
+        const id = Number(req.params.id);
         const campaign = await prisma.campaign.findUnique({
             where: { id },
+            include: {
+                campaignProducts: true,
+                priceHistories: {
+                    orderBy: { changedAt: 'desc' },
+                    take: 50,
+                },
+            },
         });
-        if (!campaign) {
+        if (!campaign)
             return res.status(404).json({ error: 'Campaign not found' });
-        }
-        const campaignProducts = await prisma.campaignProduct.findMany({
-            where: { campaignId: id },
-        });
-        const priceHistory = await prisma.priceHistory.findMany({
-            where: { campaignId: id },
-            orderBy: { changedAt: 'asc' },
-        });
-        res.json(Object.assign(Object.assign({}, campaign), { campaignProducts,
-            priceHistory }));
+        res.json(campaign);
     }
-    catch (error) {
-        console.error(`❌ Failed to get campaign ${req.params.id}:`, error);
+    catch (err) {
+        console.error('❌ Failed to get campaign by id:', err);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

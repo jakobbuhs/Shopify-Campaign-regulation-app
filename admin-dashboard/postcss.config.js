@@ -1,1 +1,7 @@
-module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };
+// admin-dashboard/postcss.config.js
+module.exports = {
+    plugins: {
+      '@tailwindcss/postcss': {},
+    },
+  };
+  
