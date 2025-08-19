@@ -10,6 +10,8 @@ import listCampaignsRouter from './campaigns/list/listCampaigns';
 import listProductsRouter from './products/listProducts';
 import cors from 'cors';
 import dbListProductsRouter from './products/dbListProducts';
+import oauthRouter from './auth/oauth';
+import auditComplianceRouter from './compliance/auditRoute';
 
 
 dotenv.config();
@@ -34,6 +36,8 @@ app.use(express.json()); // Make sure this comes before the route
 app.use(createCampaignRouter);
 app.use(listCampaignsRouter);
 app.use(dbListProductsRouter);
+app.use(oauthRouter);
+
 app.use(cors({
     origin: [process.env.APP_URL || 'http://localhost:3000'],
   }));

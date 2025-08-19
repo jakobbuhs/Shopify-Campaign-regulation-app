@@ -86,3 +86,11 @@ model Variant {
 
   @@index([title])
 }
+model Shop {
+  id           Int      @id @default(autoincrement())
+  domain       String   @unique
+  accessToken  String
+  scopes       String
+  installedAt  DateTime @default(now())
+  // optional: relations to campaigns/variants if you want multi-tenant scoping
+}
