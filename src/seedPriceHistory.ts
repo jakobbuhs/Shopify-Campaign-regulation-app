@@ -13,7 +13,13 @@ const shop = new GraphQLClient(
 async function seedVariant(variantGid: string) {
   // Fetch current price
   const { productVariant } = (await shop.request(
-    gql`query ($id: ID!) { productVariant(id: $id) { price } }`,
+    gql`
+      query ($id: ID!) {
+        productVariant(id: $id) {
+          price
+        }
+      }
+    `,
     { id: variantGid }
   )) as any;
 

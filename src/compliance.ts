@@ -49,14 +49,21 @@ export async function validateVariantsForCampaign(
     },
     _min: { price: true },
   });
-  const minMap = new Map(grouped.map(g => [g.variantId, g._min.price])); // Decimal | null
+  const minMap = new Map(grouped.map((g) => [g.variantId, g._min.price])); // Decimal | null
 
   // 2) Fetch current price for each variant from Shopify (this is what we’ll set as compareAtPrice)
-  const VARIANT_Q = gql`query($id: ID!) { productVariant(id: $id) { id price } }`;
+  const VARIANT_Q = gql`
+    query ($id: ID!) {
+      productVariant(id: $id) {
+        id
+        price
+      }
+    }
+  `;
   const currentPriceMap = new Map<string, number | null>();
   for (const id of variantIds) {
     try {
-      const resp = await shopClient.request(VARIANT_Q, { id }) as any;
+      const resp = (await shopClient.request(VARIANT_Q, { id })) as any;
       const price = resp?.productVariant?.price;
       currentPriceMap.set(id, price != null ? parseFloat(price) : null);
     } catch {

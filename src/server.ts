@@ -3,7 +3,6 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient, PriceChangeSource, Prisma } from '@prisma/client';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import { verifyShopifyWebhook } from './webhookVerifier';
 import createCampaignRouter from './campaigns/create/createCampaign';
 import listCampaignsRouter from './campaigns/list/listCampaigns';
@@ -12,7 +11,6 @@ import cors from 'cors';
 import dbListProductsRouter from './products/dbListProducts';
 import oauthRouter from './auth/oauth';
 import auditComplianceRouter from './compliance/auditRoute';
-
 
 dotenv.config();
 
@@ -37,12 +35,15 @@ app.use(createCampaignRouter);
 app.use(listCampaignsRouter);
 app.use(dbListProductsRouter);
 app.use(oauthRouter);
+app.use(auditComplianceRouter);
 
-app.use(cors({
+app.use(
+  cors({
     origin: [process.env.APP_URL || 'http://localhost:3000'],
-  }));
-  
-  app.use(listProductsRouter);
+  })
+);
+
+app.use(listProductsRouter);
 
 // Webhook route with HMAC verifier middleware
 app.post(

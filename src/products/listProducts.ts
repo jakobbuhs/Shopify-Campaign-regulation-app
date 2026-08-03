@@ -44,7 +44,7 @@ router.get('/products', async (_req: Request, res: Response) => {
       p.node.variants.edges.map((v: any) => ({
         id: v.node.id,
         name: `${p.node.title} - ${v.node.title}`,
-        price: v.node.price
+        price: v.node.price,
       }))
     );
 

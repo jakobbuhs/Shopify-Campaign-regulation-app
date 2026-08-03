@@ -16,7 +16,7 @@ if (!SHOP_DOMAIN || !ACCESS_TOKEN || !APP_URL) {
   process.exit(1);
 }
 
-const endpoint = `https://${SHOP_DOMAIN}/admin/api/2023-10/graphql.json`;
+const endpoint = `https://${SHOP_DOMAIN}/admin/api/2024-10/graphql.json`;
 
 const mutation: RequestDocument = gql`
   mutation webhookSubscriptionCreate(
@@ -46,15 +46,10 @@ const variables: Variables = {
 
 async function registerWebhook() {
   try {
-    const data = await request(
-      endpoint,
-      mutation,
-      variables,
-      {
-        'X-Shopify-Access-Token': ACCESS_TOKEN || '',
-        'Content-Type': 'application/json',
-      }
-    ) as {
+    const data = (await request(endpoint, mutation, variables, {
+      'X-Shopify-Access-Token': ACCESS_TOKEN || '',
+      'Content-Type': 'application/json',
+    })) as {
       webhookSubscriptionCreate: {
         userErrors: { field: string[]; message: string }[];
         webhookSubscription: { id: string; endpoint: string };
