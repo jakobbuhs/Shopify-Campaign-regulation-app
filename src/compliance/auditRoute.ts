@@ -1,23 +1,11 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { GraphQLClient, gql } from 'graphql-request';
+import { gql } from 'graphql-request';
 import dotenv from 'dotenv';
 import { getClientForShop } from '../lib/shopClient';
 dotenv.config();
 const router = express.Router();
 const prisma = new PrismaClient();
-
-/**
- * Helper: get a GraphQL client for the single shop you’re using today.
- * If you’ve enabled multi-shop OAuth, resolve the domain dynamically from req (or Shop table).
- */
-function getClient() {
-  const domain = process.env.SHOP_DOMAIN!;
-  const token = process.env.SHOPIFY_ACCESS_TOKEN!; // or fetch from Shop table
-  return new GraphQLClient(`https://${domain}/admin/api/2024-10/graphql.json`, {
-    headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
-  });
-}
 
 const PRODUCT_QUERY = gql`
   query ($id: ID!) {
@@ -54,7 +42,6 @@ router.get('/compliance/audit', async (req, res) => {
       take: 5000, // safety cap
     });
 
-    const client = getClient();
     const violations: Array<{
       variantId: string;
       currentPrice: number;
