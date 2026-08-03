@@ -3,7 +3,6 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient, PriceChangeSource, Prisma } from '@prisma/client';
 import dotenv from 'dotenv';
-import crypto from 'crypto';
 import { verifyShopifyWebhook } from './webhookVerifier';
 import createCampaignRouter from './campaigns/create/createCampaign';
 import listCampaignsRouter from './campaigns/list/listCampaigns';
@@ -36,6 +35,7 @@ app.use(createCampaignRouter);
 app.use(listCampaignsRouter);
 app.use(dbListProductsRouter);
 app.use(oauthRouter);
+app.use(auditComplianceRouter);
 
 app.use(
   cors({
