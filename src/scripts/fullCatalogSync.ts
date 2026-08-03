@@ -24,7 +24,9 @@ const PRODUCTS_QUERY = gql`
           handle
         }
       }
-      pageInfo { hasNextPage }
+      pageInfo {
+        hasNextPage
+      }
     }
   }
 `;
@@ -42,7 +44,9 @@ const VARIANTS_QUERY = gql`
             price
           }
         }
-        pageInfo { hasNextPage }
+        pageInfo {
+          hasNextPage
+        }
       }
     }
   }

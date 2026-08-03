@@ -8,19 +8,17 @@ const prisma = new PrismaClient();
 
 router.post('/campaigns/create', async (req: Request, res: Response) => {
   try {
-    const {
-      name, type, startAt, endAt, variantIds, discountLogic,
-      override30d, overrideReason,
-    } = req.body as {
-      name: string;
-      type: 'SALE';
-      startAt: string;
-      endAt: string;
-      variantIds: string[];
-      discountLogic: { type: 'percentage' | 'amount'; value: number };
-      override30d?: boolean;
-      overrideReason?: string;
-    };
+    const { name, type, startAt, endAt, variantIds, discountLogic, override30d, overrideReason } =
+      req.body as {
+        name: string;
+        type: 'SALE';
+        startAt: string;
+        endAt: string;
+        variantIds: string[];
+        discountLogic: { type: 'percentage' | 'amount'; value: number };
+        override30d?: boolean;
+        overrideReason?: string;
+      };
 
     if (!name || !startAt || !endAt || !Array.isArray(variantIds) || variantIds.length === 0) {
       return res.status(400).json({ error: 'Missing required fields.' });
@@ -33,11 +31,12 @@ router.post('/campaigns/create', async (req: Request, res: Response) => {
     const violations = await validateVariantsForCampaign(variantIds, startDate);
 
     // Only these two reasons are overridable
-    const isOverridableReason = (r: string) =>
-      r === 'NO_HISTORY' || r === 'COMPARE_ABOVE_30D_LOW';
+    const isOverridableReason = (r: string) => r === 'NO_HISTORY' || r === 'COMPARE_ABOVE_30D_LOW';
 
     // If override30d=true, filter out the overridable ones
-    const nonOverridable = violations.filter(v => !(override30d && isOverridableReason(v.reason)));
+    const nonOverridable = violations.filter(
+      (v) => !(override30d && isOverridableReason(v.reason))
+    );
 
     if (nonOverridable.length > 0) {
       return res.status(422).json({
@@ -58,7 +57,7 @@ router.post('/campaigns/create', async (req: Request, res: Response) => {
         discountLogic,
         status: CampaignStatus.DRAFT,
         campaignProducts: {
-          createMany: { data: variantIds.map(id => ({ variantId: id })) },
+          createMany: { data: variantIds.map((id) => ({ variantId: id })) },
         },
       },
     });

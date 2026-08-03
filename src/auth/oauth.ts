@@ -11,9 +11,12 @@ const prisma = new PrismaClient();
 
 const { SHOPIFY_API_KEY, SHOPIFY_API_SECRET, APP_URL } = process.env;
 const SCOPES = [
-  'read_products','write_products',
-  'read_discounts','write_discounts',
-  'read_price_rules','write_price_rules',
+  'read_products',
+  'write_products',
+  'read_discounts',
+  'write_discounts',
+  'read_price_rules',
+  'write_price_rules',
   'read_orders',
 ].join(',');
 
@@ -33,14 +36,15 @@ router.get('/auth', async (req, res) => {
 
 // 2) Callback: exchange code for token
 router.get('/auth/callback', async (req, res) => {
-  const { shop, code, state, hmac } = req.query as Record<string,string>;
+  const { shop, code, state, hmac } = req.query as Record<string, string>;
   if (!shop || !code || !state || !hmac) return res.status(400).send('Missing params');
 
   // verify HMAC
   const msg = Object.entries(req.query)
     .filter(([k]) => k !== 'hmac')
-    .sort(([a],[b]) => a.localeCompare(b))
-    .map(([k,v]) => `${k}=${v}`).join('&');
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
   const digest = crypto.createHmac('sha256', SHOPIFY_API_SECRET!).update(msg).digest('hex');
   if (digest !== hmac) return res.status(400).send('Invalid HMAC');
 

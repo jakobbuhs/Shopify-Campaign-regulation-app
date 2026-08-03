@@ -77,9 +77,7 @@ describe('validateVariantsForCampaign', () => {
   });
 
   it('flags COMPARE_ABOVE_30D_LOW when the current price exceeds the 30-day low', async () => {
-    groupByMock.mockResolvedValue([
-      { variantId: 'v-above', _min: { price: decimal('80.00') } },
-    ]);
+    groupByMock.mockResolvedValue([{ variantId: 'v-above', _min: { price: decimal('80.00') } }]);
     requestMock.mockResolvedValue({ productVariant: { id: 'v-above', price: '100.00' } });
 
     const result = await validateVariantsForCampaign(['v-above'], START);
@@ -94,9 +92,7 @@ describe('validateVariantsForCampaign', () => {
   });
 
   it('passes when the current price is below the 30-day low', async () => {
-    groupByMock.mockResolvedValue([
-      { variantId: 'v-ok', _min: { price: decimal('100.00') } },
-    ]);
+    groupByMock.mockResolvedValue([{ variantId: 'v-ok', _min: { price: decimal('100.00') } }]);
     requestMock.mockResolvedValue({ productVariant: { id: 'v-ok', price: '90.00' } });
 
     const result = await validateVariantsForCampaign(['v-ok'], START);
@@ -105,9 +101,7 @@ describe('validateVariantsForCampaign', () => {
   });
 
   it('passes when the current price equals the 30-day low (boundary is inclusive)', async () => {
-    groupByMock.mockResolvedValue([
-      { variantId: 'v-equal', _min: { price: decimal('50.00') } },
-    ]);
+    groupByMock.mockResolvedValue([{ variantId: 'v-equal', _min: { price: decimal('50.00') } }]);
     requestMock.mockResolvedValue({ productVariant: { id: 'v-equal', price: '50.00' } });
 
     const result = await validateVariantsForCampaign(['v-equal'], START);

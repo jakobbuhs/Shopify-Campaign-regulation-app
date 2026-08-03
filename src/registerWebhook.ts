@@ -46,15 +46,10 @@ const variables: Variables = {
 
 async function registerWebhook() {
   try {
-    const data = await request(
-      endpoint,
-      mutation,
-      variables,
-      {
-        'X-Shopify-Access-Token': ACCESS_TOKEN || '',
-        'Content-Type': 'application/json',
-      }
-    ) as {
+    const data = (await request(endpoint, mutation, variables, {
+      'X-Shopify-Access-Token': ACCESS_TOKEN || '',
+      'Content-Type': 'application/json',
+    })) as {
       webhookSubscriptionCreate: {
         userErrors: { field: string[]; message: string }[];
         webhookSubscription: { id: string; endpoint: string };

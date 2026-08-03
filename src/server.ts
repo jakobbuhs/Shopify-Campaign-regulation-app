@@ -13,7 +13,6 @@ import dbListProductsRouter from './products/dbListProducts';
 import oauthRouter from './auth/oauth';
 import auditComplianceRouter from './compliance/auditRoute';
 
-
 dotenv.config();
 
 const app = express();
@@ -38,11 +37,13 @@ app.use(listCampaignsRouter);
 app.use(dbListProductsRouter);
 app.use(oauthRouter);
 
-app.use(cors({
+app.use(
+  cors({
     origin: [process.env.APP_URL || 'http://localhost:3000'],
-  }));
-  
-  app.use(listProductsRouter);
+  })
+);
+
+app.use(listProductsRouter);
 
 // Webhook route with HMAC verifier middleware
 app.post(

@@ -14,9 +14,7 @@ router.get('/campaigns', async (req: Request, res: Response) => {
     const limit = Math.min(parseInt((req.query.limit as string) || '100', 10), 200);
 
     const where =
-      statusParam && (statusParam in CampaignStatus)
-        ? { status: statusParam as CampaignStatus }
-        : {};
+      statusParam && statusParam in CampaignStatus ? { status: statusParam as CampaignStatus } : {};
 
     // sensible ordering: upcoming/active first by start date; finished last by end date desc
     const orderBy =

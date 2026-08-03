@@ -33,7 +33,10 @@ async function applyCampaigns() {
   for (const campaign of campaigns) {
     console.log(`🎯 Activating campaign ${campaign.id} - ${campaign.name}`);
 
-    const discount = campaign.discountLogic as { type: 'percentage' | 'amount'; value: number } | null;
+    const discount = campaign.discountLogic as {
+      type: 'percentage' | 'amount';
+      value: number;
+    } | null;
     if (!discount) {
       console.warn(`⚠️ Missing discount logic in campaign ${campaign.id}`);
       continue;
@@ -63,7 +66,9 @@ async function applyCampaigns() {
               id
               price
               compareAtPrice
-              product { id }
+              product {
+                id
+              }
             }
           }
         `;
@@ -88,8 +93,13 @@ async function applyCampaigns() {
         const BULK_UPDATE = gql`
           mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
             productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-              product { id }
-              userErrors { field message }
+              product {
+                id
+              }
+              userErrors {
+                field
+                message
+              }
             }
           }
         `;
@@ -116,7 +126,9 @@ async function applyCampaigns() {
           data: {
             variantId: entry.variantId,
             price: new Prisma.Decimal(originalPrice),
-            compareAtPrice: variant.compareAtPrice ? new Prisma.Decimal(variant.compareAtPrice) : null,
+            compareAtPrice: variant.compareAtPrice
+              ? new Prisma.Decimal(variant.compareAtPrice)
+              : null,
             changedBy: PriceChangeSource.APP,
             changedAt: now,
             campaignId: campaign.id,
@@ -125,7 +137,10 @@ async function applyCampaigns() {
 
         console.log(`✅ ${variantIdGid}: ${originalPrice} → ${finalPrice.toFixed(2)}`);
       } catch (err: any) {
-        console.error(`❌ Failed variant ${variantIdGid}:`, err?.response?.data || err?.message || err);
+        console.error(
+          `❌ Failed variant ${variantIdGid}:`,
+          err?.response?.data || err?.message || err
+        );
       }
     }
 
@@ -155,7 +170,11 @@ async function expireCampaigns() {
         // 1) Fetch product id
         const FETCH_VARIANT = gql`
           query ($id: ID!) {
-            productVariant(id: $id) { product { id } }
+            productVariant(id: $id) {
+              product {
+                id
+              }
+            }
           }
         `;
         const resp = (await client.request(FETCH_VARIANT, { id: variantIdGid })) as any;
@@ -180,7 +199,10 @@ async function expireCampaigns() {
         const BULK_UPDATE = gql`
           mutation ($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
             productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-              userErrors { field message }
+              userErrors {
+                field
+                message
+              }
             }
           }
         `;
@@ -209,7 +231,10 @@ async function expireCampaigns() {
 
         console.log(`✅ Reverted ${variantIdGid} to ${revertPrice}`);
       } catch (err: any) {
-        console.error(`❌ Failed to revert variant ${variantIdGid}:`, err?.response?.data || err?.message || err);
+        console.error(
+          `❌ Failed to revert variant ${variantIdGid}:`,
+          err?.response?.data || err?.message || err
+        );
       }
     }
 
