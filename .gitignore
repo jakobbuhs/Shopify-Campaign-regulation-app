@@ -1,6 +1,18 @@
-.env
+# Dependencies
 node_modules
-.next/
+**/node_modules
 
-.env.local
+# Build output
+dist/
+.next/
+**/.next/
+*.tsbuildinfo
+
+# Environment variables (keep *.example templates tracked)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Local tooling
 .dockerignore
